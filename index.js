@@ -211,33 +211,32 @@ async function ensureUserAccount(lineUserId) {
   }
 
   try {
-    // 檢查是否已存在該 LINE User ID 的帳戶
-    const existingUser = await db.collection('users').where('lineUserId', '==', lineUserId).get();
+    // 檢查是否已存在該 LINE User ID 的綁定
+    const existingBinding = await db.collection('bindings').where('lineUserId', '==', lineUserId).get();
     
-    if (existingUser.empty) {
-      // 建立新帳戶
-      const newUserRef = await db.collection('users').add({
+    if (existingBinding.empty) {
+      // 建立新綁定（使用 LINE ID 作為文檔 ID）
+      const newBindingRef = db.collection('bindings').doc();
+      await newBindingRef.set({
+        appUserId: null, // 暫時為 null，等待 App 用戶綁定
         lineUserId: lineUserId,
-        lineConnected: true,
-        lineConnectedAt: admin.firestore.FieldValue.serverTimestamp(),
-        createdAt: admin.firestore.FieldValue.serverTimestamp(),
+        boundAt: admin.firestore.FieldValue.serverTimestamp(),
         lastActiveAt: admin.firestore.FieldValue.serverTimestamp(),
         source: 'line_bot'
       });
       
-      console.log(`✅ 已為 LINE User ID ${lineUserId} 建立新帳戶: ${newUserRef.id}`);
+      console.log(`✅ 已為 LINE User ID ${lineUserId} 建立新綁定: ${newBindingRef.id}`);
     } else {
       // 更新最後活動時間
-      const userDoc = existingUser.docs[0];
-      await userDoc.ref.update({
-        lastActiveAt: admin.firestore.FieldValue.serverTimestamp(),
-        lineConnected: true
+      const bindingDoc = existingBinding.docs[0];
+      await bindingDoc.ref.update({
+        lastActiveAt: admin.firestore.FieldValue.serverTimestamp()
       });
       
-      console.log(`✅ 找到現有帳戶: ${userDoc.id}`);
+      console.log(`✅ 找到現有綁定: ${bindingDoc.id}`);
     }
   } catch (error) {
-    console.error('建立使用者帳戶錯誤:', error);
+    console.error('建立使用者綁定錯誤:', error);
   }
 }
 
