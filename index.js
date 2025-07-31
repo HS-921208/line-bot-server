@@ -190,7 +190,7 @@ async function handleTextMessage(event) {
     } else if (userMessage.includes('選單') || userMessage.includes('功能') || userMessage.includes('幫助')) {
       return showMainMenu(event);
     } else {
-      // 預設顯示主選單
+      // 預設顯示主選單 - 所有其他訊息都顯示主選單
       return showMainMenu(event);
     }
 
@@ -571,10 +571,8 @@ async function handlePostback(event) {
       return skipMedicineReminder(event, reminderId);
   }
 
-    return client.replyMessage(event.replyToken, {
-      type: 'text',
-      text: '未知的操作'
-    });
+    // 如果沒有匹配的操作，顯示主選單
+    return showMainMenu(event);
   } catch (error) {
     console.error('處理按鈕點擊錯誤:', error);
     return Promise.resolve(null);
@@ -616,7 +614,27 @@ async function showTodayReminders(event) {
     if (remindersSnapshot.empty) {
       return client.replyMessage(event.replyToken, {
         type: 'text',
-        text: '📋 今日提醒\n\n✅ 目前沒有設定任何提醒'
+        text: '📋 今日提醒\n\n✅ 目前沒有設定任何提醒',
+        quickReply: {
+          items: [
+            {
+              type: 'action',
+              action: {
+                type: 'postback',
+                label: '🔗 連接 App',
+                data: 'action=connect_app'
+              }
+            },
+            {
+              type: 'action',
+              action: {
+                type: 'postback',
+                label: '🏠 主選單',
+                data: 'action=show_main_menu'
+              }
+            }
+          ]
+        }
       });
     }
 
@@ -717,7 +735,27 @@ async function showMedicineRecords(event) {
     if (recordsSnapshot.empty) {
       return client.replyMessage(event.replyToken, {
         type: 'text',
-        text: '📊 服藥記錄\n\n📝 目前沒有服藥記錄'
+        text: '📊 服藥記錄\n\n📝 目前沒有服藥記錄',
+        quickReply: {
+          items: [
+            {
+              type: 'action',
+              action: {
+                type: 'postback',
+                label: '📋 今日提醒',
+                data: 'action=show_today_reminders'
+              }
+            },
+            {
+              type: 'action',
+              action: {
+                type: 'postback',
+                label: '🏠 主選單',
+                data: 'action=show_main_menu'
+              }
+            }
+          ]
+        }
       });
     }
 
