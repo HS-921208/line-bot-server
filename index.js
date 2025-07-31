@@ -16,14 +16,15 @@ const config = {
 // Firebase Admin SDK 初始化
 let db;
 try {
-  // 嘗試從環境變數初始化 Firebase
+  // 簡化初始化過程
   if (process.env.FIREBASE_SERVICE_ACCOUNT) {
     const serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT);
     admin.initializeApp({
-      credential: admin.credential.cert(serviceAccount)
+      credential: admin.credential.cert(serviceAccount),
+      projectId: serviceAccount.project_id
     });
   } else {
-    // 使用預設憑證（適用於 Google Cloud Platform）
+    // 使用預設憑證
     admin.initializeApp();
   }
   db = admin.firestore();
@@ -37,6 +38,7 @@ try {
 console.log('=== LINE Bot 設定檢查 ===');
 console.log('Channel Access Token:', config.channelAccessToken ? '已設定' : '未設定');
 console.log('Channel Secret:', config.channelSecret ? '已設定' : '未設定');
+console.log('Firebase 狀態:', db ? '已連接' : '未連接');
 
 // 安全地初始化 LINE Client
 let client;
@@ -1058,6 +1060,7 @@ app.listen(port, () => {
   console.log(`✅ LINE Bot 服務器運行在 port ${port}`);
   console.log(`🌐 健康檢查: http://localhost:${port}/health`);
   console.log(`🔗 Webhook: http://localhost:${port}/webhook`);
+  console.log(`📊 環境檢查: http://localhost:${port}/env-check`);
 });
 
 // 錯誤處理
