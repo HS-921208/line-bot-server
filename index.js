@@ -255,34 +255,42 @@ async function showAccountInfo(event) {
     // 確保帳戶存在
     await ensureUserAccount(userId);
 
-    // 獲取帳戶資訊
-    const lineUserRef = db.collection('users').where('lineUserId', '==', userId);
-    const lineUserSnapshot = await lineUserRef.get();
+    // 從 bindings 集合獲取帳戶資訊
+    const bindingRef = db.collection('bindings').where('lineUserId', '==', userId);
+    const bindingSnapshot = await bindingRef.get();
     
-    if (lineUserSnapshot.empty) {
+    if (bindingSnapshot.empty) {
       return client.replyMessage(event.replyToken, {
         type: 'text',
-        text: '❌ 找不到您的帳戶'
+        text: '❌ 找不到您的帳戶，請先在 App 中連接 LINE'
       });
     }
 
-    const userDoc = lineUserSnapshot.docs[0];
-    const userData = userDoc.data();
+    const bindingDoc = bindingSnapshot.docs[0];
+    const bindingData = bindingDoc.data();
+    const firebaseUid = bindingData.appUserId;
+    
+    if (!firebaseUid) {
+      return client.replyMessage(event.replyToken, {
+        type: 'text',
+        text: '❌ 您的 LINE 帳戶尚未與 App 連接，請先在 App 中連接 LINE'
+      });
+    }
     
     // 獲取提醒數量
-    const remindersRef = db.collection('users').doc(userDoc.id).collection('reminders');
+    const remindersRef = db.collection('users').doc(firebaseUid).collection('reminders');
     const remindersSnapshot = await remindersRef.get();
     
     // 獲取服藥記錄數量
-    const recordsRef = db.collection('users').doc(userDoc.id).collection('medicine_records');
+    const recordsRef = db.collection('users').doc(firebaseUid).collection('medicine_records');
     const recordsSnapshot = await recordsRef.get();
     
-    const createdAt = userData.createdAt ? userData.createdAt.toDate().toLocaleDateString('zh-TW') : '未知';
+    const boundAt = bindingData.boundAt ? bindingData.boundAt.toDate().toLocaleDateString('zh-TW') : '未知';
     
     let message = '👤 帳戶資訊\n\n';
     message += `📱 LINE ID: ${userId}\n`;
-    message += `🆔 帳戶 ID: ${userDoc.id}\n`;
-    message += `📅 建立時間: ${createdAt}\n`;
+    message += `🆔 App 帳戶 ID: ${firebaseUid}\n`;
+    message += `📅 連接時間: ${boundAt}\n`;
     message += `💊 提醒數量: ${remindersSnapshot.size} 個\n`;
     message += `📊 服藥記錄: ${recordsSnapshot.size} 筆\n`;
     message += `🔗 連接狀態: ✅ 已連接\n\n`;
@@ -592,18 +600,26 @@ async function showTodayReminders(event) {
       });
     }
 
-    // 從 Firebase 獲取使用者的 LINE ID 對應的 Firebase UID
-    const lineUserRef = db.collection('users').where('lineUserId', '==', userId);
-    const lineUserSnapshot = await lineUserRef.get();
+    // 從 bindings 集合獲取使用者的 LINE ID 對應的 Firebase UID
+    const bindingRef = db.collection('bindings').where('lineUserId', '==', userId);
+    const bindingSnapshot = await bindingRef.get();
     
-    if (lineUserSnapshot.empty) {
+    if (bindingSnapshot.empty) {
       return client.replyMessage(event.replyToken, {
         type: 'text',
         text: '❌ 找不到您的帳戶，請先在 App 中連接 LINE'
       });
     }
 
-    const firebaseUid = lineUserSnapshot.docs[0].id;
+    const bindingDoc = bindingSnapshot.docs[0];
+    const firebaseUid = bindingDoc.data().appUserId;
+    
+    if (!firebaseUid) {
+      return client.replyMessage(event.replyToken, {
+        type: 'text',
+        text: '❌ 您的 LINE 帳戶尚未與 App 連接，請先在 App 中連接 LINE'
+      });
+    }
     
     // 獲取今日提醒
     const today = new Date();
@@ -646,8 +662,12 @@ async function showTodayReminders(event) {
       const reminder = doc.data();
       const reminderTime = `${reminder.hour.toString().padStart(2, '0')}:${reminder.minute.toString().padStart(2, '0')}`;
       
-      message += `💊 ${reminderTime} - ${reminder.medicineName}\n`;
-      message += `   劑量：${reminder.dosage}\n\n`;
+      // 處理藥品名稱，支援舊版 medicine 和新版 medicineName 欄位
+      const medicineName = reminder.medicineName || reminder.medicine || '未知藥物';
+      const dosage = reminder.dosage || '1顆';
+      
+      message += `💊 ${reminderTime} - ${medicineName}\n`;
+      message += `   劑量：${dosage}\n\n`;
       
       // 為每個提醒添加按鈕
       quickReplyItems.push(
@@ -716,18 +736,26 @@ async function showMedicineRecords(event) {
       });
     }
 
-    // 從 Firebase 獲取使用者的 LINE ID 對應的 Firebase UID
-    const lineUserRef = db.collection('users').where('lineUserId', '==', userId);
-    const lineUserSnapshot = await lineUserRef.get();
+    // 從 bindings 集合獲取使用者的 LINE ID 對應的 Firebase UID
+    const bindingRef = db.collection('bindings').where('lineUserId', '==', userId);
+    const bindingSnapshot = await bindingRef.get();
     
-    if (lineUserSnapshot.empty) {
+    if (bindingSnapshot.empty) {
       return client.replyMessage(event.replyToken, {
         type: 'text',
         text: '❌ 找不到您的帳戶，請先在 App 中連接 LINE'
       });
     }
 
-    const firebaseUid = lineUserSnapshot.docs[0].id;
+    const bindingDoc = bindingSnapshot.docs[0];
+    const firebaseUid = bindingDoc.data().appUserId;
+    
+    if (!firebaseUid) {
+      return client.replyMessage(event.replyToken, {
+        type: 'text',
+        text: '❌ 您的 LINE 帳戶尚未與 App 連接，請先在 App 中連接 LINE'
+      });
+    }
     
     // 獲取最近的服藥記錄
     const recordsRef = db.collection('users').doc(firebaseUid).collection('medicine_records');
@@ -767,9 +795,13 @@ async function showMedicineRecords(event) {
       const date = new Date(record.date).toLocaleDateString('zh-TW');
       const time = record.time || '未記錄時間';
       
+      // 處理藥品名稱，支援舊版 medicine 和新版 medicineName 欄位
+      const medicineName = record.medicineName || record.medicine || '未知藥物';
+      const dosage = record.dosage || '1顆';
+      
       message += `📅 ${date} ${time}\n`;
-      message += `💊 ${record.medicineName}\n`;
-      message += `💊 劑量：${record.dosage}\n`;
+      message += `💊 ${medicineName}\n`;
+      message += `💊 劑量：${dosage}\n`;
       if (record.notes) {
         message += `📝 備註：${record.notes}\n`;
       }
@@ -829,18 +861,26 @@ async function recordMedicineTaken(event, reminderId) {
       });
     }
 
-    // 從 Firebase 獲取使用者的 LINE ID 對應的 Firebase UID
-    const lineUserRef = db.collection('users').where('lineUserId', '==', userId);
-    const lineUserSnapshot = await lineUserRef.get();
+    // 從 bindings 集合獲取使用者的 LINE ID 對應的 Firebase UID
+    const bindingRef = db.collection('bindings').where('lineUserId', '==', userId);
+    const bindingSnapshot = await bindingRef.get();
     
-    if (lineUserSnapshot.empty) {
+    if (bindingSnapshot.empty) {
       return client.replyMessage(event.replyToken, {
         type: 'text',
         text: '❌ 找不到您的帳戶，請先在 App 中連接 LINE'
       });
     }
 
-    const firebaseUid = lineUserSnapshot.docs[0].id;
+    const bindingDoc = bindingSnapshot.docs[0];
+    const firebaseUid = bindingDoc.data().appUserId;
+    
+    if (!firebaseUid) {
+      return client.replyMessage(event.replyToken, {
+        type: 'text',
+        text: '❌ 您的 LINE 帳戶尚未與 App 連接，請先在 App 中連接 LINE'
+      });
+    }
     
     // 獲取提醒資訊
     const reminderRef = db.collection('users').doc(firebaseUid).collection('reminders').doc(reminderId);
@@ -855,11 +895,15 @@ async function recordMedicineTaken(event, reminderId) {
 
     const reminder = reminderDoc.data();
     
+    // 處理藥品名稱，支援舊版 medicine 和新版 medicineName 欄位
+    const medicineName = reminder.medicineName || reminder.medicine || '未知藥物';
+    const dosage = reminder.dosage || '1顆';
+    
     // 記錄服藥
     const now = new Date();
     const recordData = {
-      medicineName: reminder.medicineName,
-      dosage: reminder.dosage,
+      medicineName: medicineName,
+      dosage: dosage,
       date: now.toISOString().split('T')[0],
       time: now.toLocaleTimeString('zh-TW', { hour: '2-digit', minute: '2-digit' }),
       notes: '透過 LINE 記錄',
@@ -870,7 +914,7 @@ async function recordMedicineTaken(event, reminderId) {
 
     return client.replyMessage(event.replyToken, {
       type: 'text',
-      text: `✅ 已記錄服藥\n\n💊 ${reminder.medicineName}\n💊 劑量：${reminder.dosage}\n⏰ 時間：${recordData.time}`,
+      text: `✅ 已記錄服藥\n\n💊 ${medicineName}\n💊 劑量：${dosage}\n⏰ 時間：${recordData.time}`,
       quickReply: {
         items: [
           {
